@@ -2,7 +2,7 @@
 # XTronical_XT_DAC_Audio_Mirror
 Mirror of XTronical's excellent XT_DAC_Audio library for ease of integration into platformio projects
 
-XTronical, if you're reading this, please consider uploading your projects/this library to your personal git. I have mirrored this for personal convenience.
+Have added ESP32-S2 support.
 
 ## Links
 https://www.xtronical.com/introduction-to-dac-audio/
