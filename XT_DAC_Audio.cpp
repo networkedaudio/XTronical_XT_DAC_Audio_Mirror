@@ -1,7 +1,7 @@
 // File: XT_DAC_Audio.cpp
-// Description: XTronical DAC Audio Library, currently supporting ESP32
+// Description: XTronical DAC Audio Library, currently supporting ESP32 and ESP32-S2
 // Version: DAC Audio V4.2.1
-// Last Update: Oct-22-2019
+// Last Update: Sep-23-2020
 //
 // Patches by TEB. Sept 16, 2019, Sep-29-2019, Oct-10-2019, Oct-21-2019, Oct-22-2019
 // Updates:
@@ -12,6 +12,10 @@
 //   Revised pointer declarations to use cpp nullptr instead of NULL/zero.
 //   Added ClearAfterPlay (Mod by Steve).
 //   Fixed XT_Wav_Class and XT_Sequence_Class sub-volume controls.
+//   
+// Patches by EMD. Sept 23 2020
+// Updates:
+// 	Added conditional compilation for ESP32-S2
 //
 // May work with other processors and/or DAC's with or without modifications
 // (c) XTronical 2018, Licensed under GNU GPL 3.0 and later, under this license absolutely no warranty given
@@ -25,6 +29,23 @@
 #include "HardwareSerial.h"
 #include "soc/sens_reg.h"  // For dacWrite() patch, TEB Sep-16-2019
 
+#if CONFIG_IDF_TARGET_ESP32S2
+#include "soc/rtc_io_reg.h"
+#include "soc/rtc_cntl_reg.h"
+#include "soc/rtc_io_periph.h"
+#include "soc/sens_struct.h"
+#endif
+
+
+#if CONFIG_IDF_TARGET_ESP32
+#define DAC1 25
+#define DAC2 26
+#elif CONFIG_IDF_TARGET_ESP32S2
+#define DAC1 17
+#define DAC2 18
+#else
+#error Target CONFIG_IDF_TARGET is not supported
+#endif
 
 
 /*  Every variable that is used in the mainline code and in the onTImer interrupt code
@@ -148,19 +169,46 @@ void IRAM_ATTR onTimer()
 //		dacWrite(DacPin,LastDacValue);			// Don't use, will cause reboot during E2Prom writes. See emulation code below.
 
         // Start of dacWrite() emulation ...
-        CLEAR_PERI_REG_MASK(SENS_SAR_DAC_CTRL1_REG, SENS_SW_TONE_EN);  //Disable Tone
-        if(DacPin==25) {
+		#if CONFIG_IDF_TARGET_ESP32
+		CLEAR_PERI_REG_MAS
+		K(SENS_SAR_DAC_CTRL1_REG, SENS_SW_TONE_EN);  //Disable Tone
+	   
+		if(DacPin==DAC1) {
 //          pinMode(DacPin, ANALOG);  // Don't enable, will cause reboot during E2Prom writes. Pre-Set by dacWrite() in XT_DAC_Audio_Class init.
             CLEAR_PERI_REG_MASK(SENS_SAR_DAC_CTRL2_REG, SENS_DAC_CW_EN1_M);
             SET_PERI_REG_BITS(RTC_IO_PAD_DAC1_REG, RTC_IO_PDAC1_DAC, LastDacValue, RTC_IO_PDAC1_DAC_S);
             SET_PERI_REG_MASK(RTC_IO_PAD_DAC1_REG, RTC_IO_PDAC1_XPD_DAC | RTC_IO_PDAC1_DAC_XPD_FORCE);
         }
-        else if(DacPin==26) {
+        else if(DacPin==DAC2) {
 //          pinMode(DacPin, ANALOG);   // Don't enable, will cause reboot during E2Prom writes. Pre-Set by dacWrite() in XT_DAC_Audio_Class init.
             CLEAR_PERI_REG_MASK(SENS_SAR_DAC_CTRL2_REG, SENS_DAC_CW_EN2_M);
             SET_PERI_REG_BITS(RTC_IO_PAD_DAC2_REG, RTC_IO_PDAC2_DAC, LastDacValue, RTC_IO_PDAC2_DAC_S);
             SET_PERI_REG_MASK(RTC_IO_PAD_DAC2_REG, RTC_IO_PDAC2_XPD_DAC | RTC_IO_PDAC2_DAC_XPD_FORCE);
         }
+	
+		#elif CONFIG_IDF_TARGET_ESP32S2
+		
+		SENS.sar_dac_ctrl1.dac_clkgate_en = 1;
+		
+		uint8_t channel = DacPin - DAC1;
+		RTCIO.pad_dac[channel].dac_xpd_force = 1;
+    
+		RTCIO.pad_dac[channel].xpd_dac = 1;
+    
+		if (channel == 0) {
+        
+		SENS.sar_dac_ctrl2.dac_cw_en1 = 0;
+    
+		} else if (channel == 1) {
+			SENS.sar_dac_ctrl2.dac_cw_en2 = 0;
+		}
+		
+		RTCIO.pad_dac[channel].dac = LastDacValue;
+	
+	
+		#endif
+     
+     
         // End of dacWrite() emulation.
 
 	}
