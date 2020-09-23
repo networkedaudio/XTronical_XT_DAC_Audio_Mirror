@@ -7,6 +7,7 @@ Have added ESP32-S2 support.
 ## Links
 https://www.xtronical.com/introduction-to-dac-audio/
 https://www.xtronical.com/dacaudio-hardware/
+https://bitluni.net/wp-content/uploads/2018/01/Audio2Header.html
 
 ## To integrate into a platformio project:
 
